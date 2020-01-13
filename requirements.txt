@@ -1,2 +1,3 @@
 Cython==0.29.14
-opentracing==2.2.0
+opentracing==2.3.0
+w3copentracing==0.1.5

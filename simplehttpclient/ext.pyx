@@ -86,33 +86,6 @@ cdef process_span_data(NativeSpanCollectedData& data):
         finish_time = time_point_as_double(data.finish_time.value())
         span.finish(finish_time)
 
-# Re-entry point
-cdef NativeResponse handle_request(PyObject* callback, const NativeRequest& nreq) nogil:
-    cdef NativeResponse nresp
-    cdef shared_ptr[NativeOpenTracingSpan] active_base_span = deref(tracer).ScopeManager().ActiveSpan()
-    cdef NativeSpan* active_span = dynamic_cast_span_ptr(active_base_span.get())
-
-    with gil:
-        # Gather any tracing data during request, especially for active span.
-        observe_spans()
-
-        # Normal request handling.
-        request = Request(bytes(nreq.path).decode('ascii'),
-                        bytes(nreq.data.value()) if nreq.data.has_value() else None)
-
-        if active_span:
-            scope = global_tracer().scope_manager.activate(<object>deref(active_span).data().python_span.value().get(), False)
-        else:
-            scope = contextmanager(lambda: iter(None))
-
-        with scope:
-            response = (<object>callback)(request)
-            nresp.code = response.code
-            if response.data is not None:
-                nresp.data = string(bytes(response.data))
-
-        return nresp
-
 cdef class SimpleHttpClient:
     cdef optional[NativeSimpleHttpClient] client
 
@@ -156,24 +129,3 @@ cdef class SimpleHttpClient:
 
     def __del__(self):
         self.client.reset()
-
-cdef class SimpleHttpServer:
-    cdef optional[NativeSimpleHttpServer] server
-
-    def __init__(self, address: str, port: int):
-        self.server.emplace(<string>address.encode('ascii'), <unsigned short>port)
-
-    def run(self, callback: Callable[[Request], Response]):
-        assert(self.server.has_value())
-        with nogil:
-            self.server.value().run(RequestHandler(&handle_request, <PyObject*>callback))
-
-        # Handle tracing data on shutdown
-        observe_spans()
-
-    def stop(self):
-        assert(self.server.has_value())
-        self.server.value().stop()
-
-    def __del__(self):
-        self.server.reset()
