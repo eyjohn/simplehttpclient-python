@@ -22,6 +22,7 @@ from otinterop cimport SpanCollectedData as NativeSpanCollectedData, \
 from typing import Callable
 from .types import Request, Response
 from opentracing import global_tracer
+from w3copentracing import Span
 from contextlib import contextmanager
 
 include "util.pxi"
@@ -101,7 +102,7 @@ cdef class SimpleHttpClient:
         scope = global_tracer().scope_manager.active
 
         # Reinstantiate the active scope in C++ if exists in python
-        if scope is not None:
+        if scope is not None and isinstance(scope.span, Span):
             span_context_to_native(scope.span.context, native_context)
             native_span_ptr = shared_ptr[NativeOpenTracingSpan](deref(tracer).StartProxySpan(
                 native_context, PythonReference(<PyObject*>scope.span)))
