@@ -45,7 +45,7 @@ cdef process_span_data(NativeSpanCollectedData& data):
     if not data.python_span.has_value():
         # First time we've seen the span. Need to create it:
         context = native_to_span_context(data.context)
-        operation_name = data.operation_name.value() if data.operation_name.has_value() else None
+        operation_name = data.operation_name.value().decode('ascii') if data.operation_name.has_value() else None
 
         # No start_time should not happen and would be populated interop tracer
         start_time = time_point_as_double(data.start_time.value()) if data.start_time.has_value() else None
